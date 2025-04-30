@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Calculadora de Distâncias - Bombeiros</title>
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    input, button { padding: 10px; margin: 10px 0; width: 100%; font-size: 16px; }
+    #resultados { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h2>Distância por Estrada - Bombeiros</h2>
+  <p><strong>Insere a morada da ocorrência:</strong></p>
+  <input type="text" id="morada" placeholder="Ex: Herdade da Barrosinha, S. Miguel de Machede">
+  <button onclick="calcularDistancias()">Calcular Distâncias</button>
+  <div id="resultados"></div>
+
+  <script>
+    const bombeiros = [
+      { nome: "CBV Évora", lat: 38.5711, lon: -7.9092 },
+      { nome: "CBV Vendas Novas", lat: 38.6398, lon: -8.4570 },
+      { nome: "CBV Montemor-o-Novo", lat: 38.6481, lon: -8.2145 },
+      { nome: "CBV Estremoz", lat: 38.8499, lon: -7.6012 },
+      { nome: "CBV Arraiolos", lat: 38.7232, lon: -7.9868 },
+      { nome: "CBV Reguengos de Monsaraz", lat: 38.4211, lon: -7.5353 },
+      { nome: "CBV Vila Viçosa", lat: 38.7754, lon: -7.4161 },
+      { nome: "CBV Mora", lat: 38.9382, lon: -8.1600 },
+      { nome: "CBV Borba", lat: 38.8055, lon: -7.4547 },
+      { nome: "CBV Redondo", lat: 38.6439, lon: -7.5469 },
+      { nome: "CBV Mourão", lat: 38.3785, lon: -7.3512 },
+      { nome: "CBV Portel", lat: 38.2967, lon: -7.6985 },
+      { nome: "CBV Alandroal", lat: 38.6319, lon: -7.4068 },
+      { nome: "CBV Viana do Alentejo", lat: 38.3830, lon: -7.4150 }
+    ];
+
+    async function calcularDistancias() {
+      const morada = document.getElementById('morada').value;
+      const resultadosDiv = document.getElementById('resultados');
+      resultadosDiv.innerHTML = 'A calcular...';
+
+      // Geocodificar a morada com Nominatim
+      const geo = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(morada)}`);
+      if (!geo.data || geo.data.length === 0) {
+        resultadosDiv.innerHTML = 'Morada não encontrada.';
+        return;
+      }
+
+      const latOcor = parseFloat(geo.data[0].lat);
+      const lonOcor = parseFloat(geo.data[0].lon);
+
+      const distancias = await Promise.all(bombeiros.map(async (b) => {
+        const rota = await axios.get(`https://router.project-osrm.org/route/v1/driving/${b.lon},${b.lat};${lonOcor},${latOcor}?overview=false`);
+        const distanciaKm = rota.data.routes[0].distance / 1000;
+        const tempoMin = (distanciaKm / 80) * 60; // velocidade média estimada: 80 km/h
+        return {
+          nome: b.nome,
+          distancia: distanciaKm.toFixed(1),
+          tempo: tempoMin.toFixed(0)
+        };
+      }));
+
+      const top3 = distancias.sort((a, b) => a.distancia - b.distancia).slice(0, 3);
+      resultadosDiv.innerHTML = '<h3>Corpos de bombeiros mais próximos:</h3>' + top3.map(d => `
+        <p>
+          <strong>${d.nome}</strong><br>
+          Distância: ${d.distancia} km<br>
+          Tempo estimado (a 80km/h): ${d.tempo} min
+        </p>
+      `).join('');
+    }
+  </script>
+</body>
+</html>
